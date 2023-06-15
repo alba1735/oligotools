@@ -1,0 +1,9 @@
+name: oligotools
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - python>=3.10
+  - pandas
+  - numpy
+  - ucsc-bedtobigbed
