@@ -1,8 +1,9 @@
 #/usr/bin/env python3
 
-import numpy as np
+# import numpy as np
 import pandas as pd
 import subprocess
+import tempfile
 import os
 import sys
 import argparse
@@ -217,6 +218,7 @@ class oligoValidate:
         self.targets = args.targets
         self.output = args.output
         self.idtConfig = args.idtconfig
+        self.blastdb = args.blastdb
 
     def run(self):
         if os.path.exists('.'.join(self.fasta.split('.')[:-1]) + '.singleline.fa'):
@@ -331,6 +333,7 @@ class oligoValidate:
         except:
             print(f'{name} not found in {self.fasta}')
             return None
+        
         name_out = f'{self.output}/{name}.txt'
         with open(name_out,'w') as f:
             f.write(name+'\noligo: '+seq+'\nlength: '+str(len(seq))+'\n')
@@ -339,6 +342,20 @@ class oligoValidate:
                     f.write(i+'\n')
             for i in self.smith_waterman(out.split('\n')[1],nucleicAcidTools.reverse_compliment(seq)):
                 f.write(i+'\n')
+
+            if self.blastdb:
+                temp = tempfile.NamedTemporaryFile(mode='w', delete=False)
+                temp.write('>temp\n'+nucleicAcidTools.reverse_compliment(seq))
+                temp.close()
+
+                blastout = subprocess.check_output(['blastn', '-db', self.blastdb, '-query', temp.name, '-task', 'blastn-short', '-outfmt', '6', '-perc_identity', '95', '-qcov_hsp_perc', '95'], text=True).strip()
+                if blastout:
+                    f.write('\nBLAST:\n')
+                    for i in blastout.split('\n'):
+                        f.write(i+'\n')
+                else:
+                    f.write('\nBLAST:\nNo BLAST hits found\n')
+
         return out
 
 if __name__ == '__main__':
@@ -361,13 +378,13 @@ if __name__ == '__main__':
     parser_gen.add_argument('-o', '--output', help='Output directory (Default: oligos)', default='oligos')
     parser_gen.add_argument('--log', help='Log output to file (optional)', default=None)
 
-    parser_val = subparsers.add_parser("validate", help="Validate oligos for tRNA targets")
+    parser_val = subparsers.add_parser("analyze", help="Validate oligos for tRNA targets")
     parser_val.add_argument('-f', '--fasta', help='Fasta file of tRNA sequences', required=True)
     parser_val.add_argument('-l', '--oligos', help='Oligo targets file that matches generated bw and bb files (all_oligos.csv)', required=True)
     parser_val.add_argument('-t', '--targets', help='Oligo targets or oligo sequences to validate in .tsv format', required=True)
     parser_val.add_argument('-o', '--output', help='Output directory (Default: targets)', default='targets')
     parser_val.add_argument('-d', '--idtconfig', help='IDT config file default: "/3Bio/,100nm,HPLC"', default="/3Bio/,100nm,HPLC")
-    parser_val.add_argument('-b', '--blastdb', help='Blast database to use (optional)')
+    parser_val.add_argument('-b', '--blastdb', help='Blast database to use (optional)', default=None)
     parser_val.add_argument('--log', help='Log output to file (optional)', default=None)
 
     args = parser.parse_args()
@@ -378,8 +395,6 @@ if __name__ == '__main__':
         directory_maker(args.output) 
         oligoGen(args).run()
 
-    if args.mode == 'validate':
+    if args.mode == 'analyze':
         directory_maker(args.output)
         oligoValidate(args).run()
-
-        #blastn -db hg38.fa -query test.fa -task blastn-short -outfmt 6 -perc_identity 95 -qcov_hsp_perc 95 > test.psl
