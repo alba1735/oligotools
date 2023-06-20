@@ -161,7 +161,11 @@ cython_debug/
 
 # Common folders
 /genomes
+/genes
 /*-tRNAs
 /oligos
 /targets
-targets.tsv
+*.tsv
+
+# MacOS
+.DS_Store

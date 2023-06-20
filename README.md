@@ -61,4 +61,6 @@ This will generate a series of text files containing the oligos, if they map pro
 The following flags can also be used:
 * `-d` or `--idtconfig`: A config file containing the IDT order information to truncate to the end (default: "/3bio/,100nm,HPLC")
 * `-b` or `--blastdb`: A blast database can also be provided to check for off-targets and this information will be added to the output files
+* `-g` or `--bedgtf`: A bed file created from a gtf file to check what blast hits are mapping to
+    * This can be generated using `awk 'OFS="\t" {if ($3=="gene") {print $1,$4-1,$5,$10,$14,$7}}' <gtf file> | tr -d '";' > <gtf file>.bed` if you only want to look at genes or `awk 'OFS="\t" {print $1,$4-1,$5,$10,$14,$7}' <gtf file> | tr -d '";' > <gtf file>.bed` if you want to look at all features from the gtf file
 * `--log`: A log file to write the output to

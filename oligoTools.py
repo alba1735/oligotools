@@ -1,6 +1,5 @@
 #/usr/bin/env python3
 
-# import numpy as np
 import pandas as pd
 import subprocess
 import tempfile
@@ -126,7 +125,7 @@ class oligoGen:
         # bedToBigBed all_top25.sorted.bed ../..g/data_large/rnadb/rnadb-hg38/genome.fa.fai all_top25.sorted.bb
         if self.genomeIndex is not None:
             print(f'Creating bigBed file: {self.output}/all_oligos.sorted.bb')
-            subprocess.run(['bedToBigBed','all_oligos.sorted.bed',self.genomeIndex,f'{self.output}/all_oligos.sorted.bb'])
+            subprocess.run(['bedToBigBed',f'{self.output}/all_oligos.sorted.bed',self.genomeIndex,f'{self.output}/all_oligos.sorted.bb'])
         else:
             print('No genome index provided, skipping bigBed creation.')
 
@@ -219,6 +218,7 @@ class oligoValidate:
         self.output = args.output
         self.idtConfig = args.idtconfig
         self.blastdb = args.blastdb
+        self.bedgtf = args.bedgtf
 
     def run(self):
         if os.path.exists('.'.join(self.fasta.split('.')[:-1]) + '.singleline.fa'):
@@ -265,7 +265,7 @@ class oligoValidate:
 
         if self.alignment_check(oligo_name,oligo_seq):
             print(f'{oligo_name} is a valid oligo and will be added to the combine_IDT.csv file.')
-            combineFile.write(f'{oligo_name},{self.lna(oligo_seq)},{self.idtConfig}\n')
+            combineFile.write(f'{oligo_name},{self.lna(oligo_seq)}{self.idtConfig}\n')
 
     def lna(self,seq):
         return ''.join(['+' + seq[i] if i%2 == 0 else seq[i] for i in range(len(seq))])
@@ -328,6 +328,7 @@ class oligoValidate:
         return [aligned_seq2_end,aligned_row,nucleicAcidTools.compliment(aligned_seq1_end)]
 
     def alignment_check(self, name, seq):
+        dashed_l = '\n' + '-'*120 + '\n'
         try:
             out = subprocess.check_output(['grep', nucleicAcidTools.reverse_compliment(seq), self.fasta, '-B', '1'], text=True).strip()
         except:
@@ -345,17 +346,48 @@ class oligoValidate:
 
             if self.blastdb:
                 temp = tempfile.NamedTemporaryFile(mode='w', delete=False)
-                temp.write('>temp\n'+nucleicAcidTools.reverse_compliment(seq))
+                temp.write(f'>{name}\n'+nucleicAcidTools.reverse_compliment(seq))
                 temp.close()
-
-                blastout = subprocess.check_output(['blastn', '-db', self.blastdb, '-query', temp.name, '-task', 'blastn-short', '-outfmt', '6', '-perc_identity', '95', '-qcov_hsp_perc', '95'], text=True).strip()
+                f.write(dashed_l)
+                blastout = subprocess.check_output(['blastn', '-db', self.blastdb, '-query', temp.name, '-task', 'blastn-short', \
+                                                    '-outfmt', '6 qseqid sseqid pident length mismatches gaps qstart qend sstart send evalue bitscore sstrand', \
+                                                    '-perc_identity', '95', '-qcov_hsp_perc', '95'], text=True).strip()
                 if blastout:
-                    f.write('\nBLAST:\n')
+                    f.write('\nBLAST Results:\n')
+                    f.write('qseqid\tsseqid\tpident\tlength\tmismatches\tgaps\tqstart\tqend\tsstart\tsend\tevalue\tbitscore\tsstrand\n')
                     for i in blastout.split('\n'):
                         f.write(i+'\n')
-                else:
-                    f.write('\nBLAST:\nNo BLAST hits found\n')
+                    if self.bedgtf:
+                        f.write(dashed_l)
+                        # Convert blastout to bed format
+                        blastoutbed = ''
+                        for i in blastout.split('\n'):
+                            if i:
+                                i = i.split('\t')
+                                if i[11] == 'plus':
+                                    blastoutbed += f'{i[1]}\t{i[7]}\t{i[8]}\t{i[0]}\t+\n'
+                                else:
+                                    blastoutbed += f'{i[1]}\t{i[8]}\t{i[7]}\t{i[0]}\t-\n'
+                                
+                        temp = tempfile.NamedTemporaryFile(mode='w', delete=False)      
+                        temp.write(blastoutbed)
+                        temp.close()
 
+                        bedout = subprocess.check_output(['bedtools', 'intersect', '-a', self.bedgtf, '-b', temp.name, '-wa'], text=True).strip()
+                        if bedout:
+                            f.write('\nBED Results:\n')
+                            j = ''
+                            for i in bedout.split('\n'):
+                                if i != j:
+                                    if int(i.split('\t')[2]) - int(i.split('\t')[1]) < 250:
+                                        f.write(i+'\t|\tWARNING! less than 250bp\n')
+                                    else:
+                                        f.write(i+'\n')
+                                # j = i
+                        else:
+                            f.write('\nBED Results:\nNo BED hits found\n')
+                else:
+                    f.write('\nBLAST Results:\nNo BLAST hits found\n')
         return out
 
 if __name__ == '__main__':
@@ -383,8 +415,9 @@ if __name__ == '__main__':
     parser_val.add_argument('-l', '--oligos', help='Oligo targets file that matches generated bw and bb files (all_oligos.csv)', required=True)
     parser_val.add_argument('-t', '--targets', help='Oligo targets or oligo sequences to validate in .tsv format', required=True)
     parser_val.add_argument('-o', '--output', help='Output directory (Default: targets)', default='targets')
-    parser_val.add_argument('-d', '--idtconfig', help='IDT config file default: "/3Bio/,100nm,HPLC"', default="/3Bio/,100nm,HPLC")
+    parser_val.add_argument('-d', '--idtconfig', help='IDT config file default: "/3Bio/,100nm"', default="/3Bio/,100nm")
     parser_val.add_argument('-b', '--blastdb', help='Blast database to use (optional)', default=None)
+    parser_val.add_argument('-g', '--bedgtf', help='Bed file that is converted from GTF format (optional)', default=None)
     parser_val.add_argument('--log', help='Log output to file (optional)', default=None)
 
     args = parser.parse_args()
