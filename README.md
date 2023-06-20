@@ -63,4 +63,6 @@ The following flags can also be used:
 * `-b` or `--blastdb`: A blast database can also be provided to check for off-targets and this information will be added to the output files
 * `-g` or `--bedgtf`: A bed file created from a gtf file to check what blast hits are mapping to
     * This can be generated using `awk 'OFS="\t" {if ($3=="gene") {print $1,$4-1,$5,$10,$14,$7}}' <gtf file> | tr -d '";' > <gtf file>.bed` if you only want to look at genes or `awk 'OFS="\t" {print $1,$4-1,$5,$10,$14,$7}' <gtf file> | tr -d '";' > <gtf file>.bed` if you want to look at all features from the gtf file
+    * Multiple bed files can be provided, this is helpful as gencode keeps the human tRNA genes in a separate file from the rest of the basic annotation
+    * Results that are less than 500bp will be seperated on the output files
 * `--log`: A log file to write the output to

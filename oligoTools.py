@@ -373,19 +373,28 @@ class oligoValidate:
                         temp.write(blastoutbed)
                         temp.close()
 
-                        bedout = subprocess.check_output(['bedtools', 'intersect', '-a', self.bedgtf, '-b', temp.name, '-wa'], text=True).strip()
-                        if bedout:
-                            f.write('\nBED Results:\n')
-                            j = ''
-                            for i in bedout.split('\n'):
-                                if i != j:
-                                    if int(i.split('\t')[2]) - int(i.split('\t')[1]) < 250:
-                                        f.write(i+'\t|\tWARNING! less than 250bp\n')
-                                    else:
-                                        f.write(i+'\n')
-                                # j = i
-                        else:
-                            f.write('\nBED Results:\nNo BED hits found\n')
+                        for i in self.bedgtf:
+                            f.write('\n'+i+' Results:\n')
+                            bedout = subprocess.check_output(['bedtools', 'intersect', '-a', i, '-b', temp.name, '-wa'], text=True).strip()
+                            if bedout:
+                                f.write('chr\tstart\tend\tname\tstrand\n')
+                                j = ''
+                                sublist = []
+                                for i in bedout.split('\n'):
+                                    if i != j:
+                                        bsize = int(i.split('\t')[2]) - int(i.split('\t')[1])
+                                        if bsize < 500:
+                                            sublist.append((i,bsize))
+                                        else:
+                                            f.write(i+'\n')
+                                    j = i
+                                if len(sublist) > 0:
+                                    f.write('\n!WARNING! Sub 500bp:\n')
+                                    f.write('chr\tstart\tend\tname\tstrand\n')
+                                    for i,bsize in sublist:
+                                        f.write(i+'\t'+str(bsize)+'\n')
+                            else:
+                                f.write('No BED hits found\n')
                 else:
                     f.write('\nBLAST Results:\nNo BLAST hits found\n')
         return out
@@ -417,7 +426,7 @@ if __name__ == '__main__':
     parser_val.add_argument('-o', '--output', help='Output directory (Default: targets)', default='targets')
     parser_val.add_argument('-d', '--idtconfig', help='IDT config file default: "/3Bio/,100nm"', default="/3Bio/,100nm")
     parser_val.add_argument('-b', '--blastdb', help='Blast database to use (optional)', default=None)
-    parser_val.add_argument('-g', '--bedgtf', help='Bed file that is converted from GTF format (optional)', default=None)
+    parser_val.add_argument('-g', '--bedgtf', help='Bed file/s that are converted from GTF format (optional)', nargs='+', default=None)
     parser_val.add_argument('--log', help='Log output to file (optional)', default=None)
 
     args = parser.parse_args()
