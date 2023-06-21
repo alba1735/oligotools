@@ -3,6 +3,8 @@
 import pandas as pd
 import subprocess
 import tempfile
+import requests
+import gzip
 import os
 import sys
 import argparse
@@ -13,6 +15,52 @@ def directory_maker(directory):
         os.makedirs(directory, exist_ok=True)
     else:
         print('Output directory already exists: {}'.format(directory))
+
+class genomeDownload:
+    def __init__(self, args):
+        if args.genome == 'hg38':
+            self.refGenome = 'https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz'
+            self.genomeIndex = 'https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.chrom.sizes'
+            self.gtRNAdb = 'http://gtrnadb.ucsc.edu/genomes/eukaryota/Hsapi38/hg38-tRNAs.tar.gz'
+            self.genesGtf = 'https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_43/gencode.v43.basic.annotation.gtf.gz'
+            self.trnasGtf = 'https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_43/gencode.v43.tRNAs.gtf.gz'
+        if args.genome == 'mm10':
+            self.refGenome = 'https://hgdownload.soe.ucsc.edu/goldenPath/mm10/bigZips/mm10.fa.gz'
+            self.genomeIndex = 'https://hgdownload.soe.ucsc.edu/goldenPath/mm10/bigZips/mm10.chrom.sizes'
+            self.gtRNAdb = 'http://gtrnadb.ucsc.edu/genomes/eukaryota/Mmusc10/mm10-tRNAs.tar.gz'
+            self.genesGtf = 'https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M32/gencode.vM32.basic.annotation.gtf.gz'
+            self.trnasGtf = 'https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M32/gencode.vM32.tRNAs.gtf.gz'
+    
+    def run(self):
+        print('Downloading genome files...')
+        self.download(self.refGenome, 'genomes')
+        self.download(self.genomeIndex, 'genomes', gz=False)
+        print('Building Blast database...')
+        subprocess.run(f'makeblastdb -in genomes/{self.refGenome.split("/")[-1].replace(".gz","")} -parse_seqids -dbtype nucl', shell=True)
+        print('Downloading gtRNAdb files...')
+        self.download(self.gtRNAdb, 'gtRNAdb', tar=True)
+        print('Downloading GTF files...')
+        self.download(self.genesGtf, 'genes')
+        self.download(self.trnasGtf, 'genes')
+        print('Creating Bed from GTF files...')
+        subprocess.run(f'awk \'OFS="\t" {{print $1,$4-1,$5,$10,$14,$7}}\' genes/{self.genesGtf.split("/")[-1].replace(".gz","").replace(".gtf","")}.gtf | tr -d \'\\"\;\' > genes/{self.genesGtf.split("/")[-1].replace(".gz","").replace(".gtf","")}.bed', shell=True)
+        subprocess.run(f'awk \'OFS="\t" {{print $1,$4-1,$5,$10,$14,$7}}\' genes/{self.trnasGtf.split("/")[-1].replace(".gz","").replace(".gtf","")}.gtf | tr -d \'\\"\;\' > genes/{self.trnasGtf.split("/")[-1].replace(".gz","").replace(".gtf","")}.bed', shell=True)
+
+    def download(self, url, directory, gz=True, tar=False):
+        r = requests.get(url)
+        name = url.split('/')[-1]
+        if gz == True:
+            name = name.replace('.gz','')
+        with open(f'{directory}/{name}','wb') as file:
+            if gz == True:
+                file.write(gzip.decompress(r.content))
+                if tar == True:
+                    tarName = name.replace('.tar','')
+                    directory_maker(f'{directory}/{tarName}')
+                    subprocess.run(f'tar -xf {directory}/{name} -C {directory}/{tarName}', shell=True)
+                    os.remove(f'{directory}/{name}')
+            else:
+                file.write(r.content)
 
 class nucleicAcidTools:
     def compliment(seq):
@@ -411,6 +459,10 @@ if __name__ == '__main__':
         required=True,
     )
 
+    parser_download = subparsers.add_parser("download", help="Download required files for oligoTools for hg38 or mm10")
+    parser_download.add_argument('-g', '--genome', help='Genome to download (hg38 or mm10)', required=True, choices=['hg38', 'mm10'])
+    parser_download.add_argument('--log', help='Log output to file (optional)', default=None)
+
     parser_gen = subparsers.add_parser("generate", help="Generate oligos for tRNA targets")
     parser_gen.add_argument('-f', '--fasta', help='Fasta file of tRNA sequences', required=True)
     parser_gen.add_argument('-b', '--bed', help='Bed file of tRNA coordinates', required=True)
@@ -432,6 +484,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     sys.stdout = open(args.log, 'w') if args.log else sys.stdout
+
+    if args.mode == 'download':
+        directory_maker('genes')
+        directory_maker('genomes')
+        directory_maker('gtRNAdb')
+        genomeDownload(args).run()
 
     if args.mode == 'generate':
         directory_maker(args.output) 

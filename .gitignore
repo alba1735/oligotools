@@ -166,6 +166,7 @@ cython_debug/
 /oligos
 /targets
 *.tsv
+/gtRNAdb
 
 # MacOS
 .DS_Store

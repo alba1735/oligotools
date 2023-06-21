@@ -27,6 +27,26 @@ Optional requirements:
 
 ## Usage
 
+### Quickstart - Example
+
+A function to download all the files need for hg38 and mm10 are provided in `oligoTools.py`. To download all the files needed for hg38, run the following command:
+
+```bash
+python oligoTools.py download -g hg38
+```
+
+You can then generate oligos using the following command:
+
+```bash
+python oligoTools.py generate -f gtRNAdb/hg38-tRNAs/hg38-tRNAs.fa -b gtRNAdb/hg38-tRNAs/hg38-tRNAs.bed -g genomes/hg38.chrom.sizes
+```
+
+And analyze the oligos using the following command:
+
+```bash
+python oligoTools.py analyze -f gtRNAdb/hg38-tRNAs/hg38-tRNAs.fa -l oligos/all_oligos.csv -t targets_test.tsv -b genomes/hg38.fa -g genes/gencode.v43.basic.annotation.bed genes/gencode.v43.tRNAs.bed
+```
+
 ### Generate oligos
 
 This tool can be used to generate oligos from a set of files from gtRNAdb. After downloading the files from gtRNAdb, the files can be processed using the following command:
