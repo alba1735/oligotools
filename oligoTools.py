@@ -263,6 +263,7 @@ class oligoValidate:
         self.fasta = args.fasta
         self.oligoDf = pd.read_csv(args.oligos,header=0)
         self.targets = args.targets
+        self.target = None
         self.output = args.output
         self.idtConfig = args.idtconfig
         self.blastdb = args.blastdb
@@ -289,13 +290,16 @@ class oligoValidate:
             with open(f'{self.output}/combine_IDT.csv','w') as combineFile:
                 for l in file.readlines():
                     oligo = l.strip().split()
-                    self.validate(oligo,combineFile)
+                    if len(oligo) > 1:
+                        if oligo[0][0] != '#':
+                            self.validate(oligo,combineFile)
 
     def validate(self,oligo,combineFile):
         oligo_name = oligo[0]
         if len(self.oligoDf[self.oligoDf['name']==oligo[1]]) > 0:
             print(f'{oligo[0]} found by oligo target name: {oligo[1]}')
             oligo_seq = self.oligoDf[self.oligoDf['name']==oligo[1]]['kmer'].values[0]
+            self.target = oligo[1]
         elif len(self.oligoDf[self.oligoDf['kmer']==oligo[1]]) > 0:
             print(f'{oligo[0]} found by oligo target sequence: {oligo[1]}')
             oligo_seq = oligo[1]
@@ -385,7 +389,10 @@ class oligoValidate:
         
         name_out = f'{self.output}/{name}.txt'
         with open(name_out,'w') as f:
-            f.write(name+'\noligo: '+seq+'\nlength: '+str(len(seq))+'\n')
+            f.write(name+'\n')
+            if self.target:
+                f.write(f'target: {self.target}\n')
+            f.write('oligo: '+seq+'\nlength: '+str(len(seq))+'\n')
             for i in out.split('\n'):
                 if i[0] == '>': 
                     f.write(i+'\n')
