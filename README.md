@@ -1,6 +1,6 @@
-# oligoTools
+# oligoTools tRNA
 
-OligoTools is a Python package for designing and analyzing oligonucleotides for Northern blots, RT-qPCR, and other applications. It will generate a set of unique oligos in a size range and will create a bigwig file of the oligo coverage across a genome. It can also be used to analyze the coverage of a set of oligos across a genome.
+OligoTools is a Python package for designing and analyzing oligonucleotides for Northern blots, RT-qPCR, and other applications in the context of tRNAs. It will generate a set of unique oligos in a size range and will create a bigwig file of the oligo coverage across a genome. It can also be used to analyze the coverage of a set of oligos across a genome.
 
 ## Installation
 
